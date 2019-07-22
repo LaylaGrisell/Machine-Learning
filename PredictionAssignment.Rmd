@@ -1,0 +1,143 @@
+---
+title: "Prediction Assignment Writeup"
+author: "Griselda Barón Martínez"
+date: "21/7/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Background
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+## Data
+
+The training data for this project are available here:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+The test data are available here:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+The data for this project come from this source: http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har.
+
+## What you should submit
+The goal of your project is to predict the manner in which they did the exercise. This is the "classe" variable in the training set. You may use any of the other variables to predict with. You should create a report describing how you built your model, how you used cross validation, what you think the expected out of sample error is, and why you made the choices you did. You will also use your prediction model to predict 20 different test cases.
+
+#### Peer Review Portion
+Your submission for the Peer Review portion should consist of a link to a Github repo with your R markdown and compiled HTML file describing your analysis. Please constrain the text of the writeup to < 2000 words and the number of figures to be less than 5. It will make it easier for the graders if you submit a repo with a gh-pages branch so the HTML page can be viewed online (and you always want to make it easy on graders :-).
+
+#### Course Project Prediction Quiz Portion
+Apply your machine learning algorithm to the 20 test cases available in the test data above and submit your predictions in appropriate format to the Course Project Prediction Quiz for automated grading.
+
+## Reproducibility
+Due to security concerns with the exchange of R code, your code will not be run during the evaluation by your classmates. Please be sure that if they download the repo, they will be able to view the compiled HTML version of your analysis.
+
+## Approach:
+Our outcome variable is classe, a factor variable. For this data set, “participants were asked to perform one set of 10 repetitions of the Unilateral Dumbbell Biceps Curl in 5 different fashions: 
+
+- exactly according to the specification (Class A) 
+- throwing the elbows to the front (Class B) 
+- lifting the dumbbell only halfway (Class C) 
+- lowering the dumbbell only halfway (Class D) 
+- throwing the hips to the front (Class E)
+
+Class A corresponds to the specified execution of the exercise, while the other 4 classes correspond to common mistakes. Two models will be tested using decision tree and random forest. The model with the highest accuracy will be chosen as our final model.
+
+### libraries
+```{r message=FALSE}
+library(ggplot2)
+library(caret)
+library(rpart)
+library(randomForest)
+library(rattle)
+
+```
+
+### Getting and Cleaning Data
+
+```{r}
+trainUrl <- "http://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+testUrl <- "http://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+
+training <- read.csv(url(trainUrl), na.strings=c("NA","#DIV/0!",""))
+test <- read.csv(url(testUrl), na.strings=c("NA","#DIV/0!",""))
+
+# Delete columns with all missing values
+training<-training[,colSums(is.na(training)) == 0]
+test<-test[,colSums(is.na(test)) == 0]
+
+# Delete variables are irrelevant for the project: user_name, raw_timestamp_part_1, raw_timestamp_part_,2 cvtd_timestamp, new_window, and  num_window (columns 1 to 7). 
+training   <-training[,-c(1:7)]
+test<-test[,-c(1:7)]
+
+```
+
+### Cross validation
+We use 70% of training set data to built a model, and use the rest to test the model
+
+```{r}
+set.seed(3567)
+
+indextrain <- createDataPartition(y=training$classe, p=0.7, list=F)
+TrainingSet <- training[indextrain, ] 
+TestingSet <- training[-indextrain, ]
+```
+
+Now let's graph the class variable to see what is the frequency of each level.
+
+```{r fig.cap='Frequency of each level of variable classe with the TrainingSet"', fig.height=4}
+ggplot(TrainingSet, aes(classe))+ geom_bar(fill="lightblue")+ 
+	ylab("frequency")
+```
+
+We can see that all level is within the same order of magnitude. Level A is the most frequent while level D is the least frequent.
+
+## Model 1: Decision Tree
+
+```{r}
+set.seed(1427)
+fit1 <- rpart(classe ~ ., data=TrainingSet, method="class")
+predict1 <- predict(fit1, TestingSet, type = "class")
+
+```
+
+
+```{r fig.cap='Classification Tree', message=NULL}
+fancyRpartPlot(fit1)
+```
+
+##### Test results
+```{r}
+# confussion matrix
+confusionMatrix(predict1, TestingSet$classe)
+
+```
+
+## Model 2: Random Forest
+
+```{r}
+fit2 <- randomForest(classe ~. , data=TrainingSet, method="class")
+
+# Predict:
+predict2 <- predict(fit2, TestingSet, type = "class")
+
+# Test results
+confusionMatrix(predict2, TestingSet$classe)
+```
+
+## Choosing model 
+Accuracy for Decision Tree model was 0.741 (95% CI: (0.730, 0.753))  compared to Random Forest model with 0.995 (95% CI: (0.993, 0.997)). Then, we choose the Random Forests model. 
+
+## Submission
+Te final outcome using the Model 2: Random Forest applied against the Testing (test) dataset is
+
+```{r}
+final_predict <- predict(fit2, test, type="class")
+final_predict
+```
+
